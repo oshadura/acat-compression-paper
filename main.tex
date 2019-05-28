@@ -66,11 +66,11 @@ The available set of compression algorithms in ROOT are:
 
 % NOTE: Brian stopped here for the evening on 16 May
 
-% TODO: cite previous work for LZ4?!?
+% TODO: cite previous work for LZ4?!? (Done)
 For data compression, we have previously expanded the available set of compression algorithms in ROOT to cover a wider part of the performance phase space, specifically oriented to improving read speeds for analysis), shown on a Figure \ref{fig:compression}.
 \begin{enumerate}
-    \item \textit{LZ4} - a LZ77 compressor with a fixed, byte-oriented encoding and without Huffman coding pass \cite{lz4}.
-    \item \textit{ZSTD} - a LZ77 algorithm supporting dictionaries, specialised by a large search window and entropy coding stage, using fast Finite State Entropy (tANS) or Huffman coding. It is developed by Facebook. \cite{zstd}
+    \item \textit{LZ4} - a LZ77 compressor with a fixed, byte-oriented encoding and without Huffman coding pass \cite{lz4} \cite{brianzhe}.
+    \item \textit{ZSTD} - a LZ77 algorithm supporting dictionaries, specialised by a large search window and entropy coding stage, using fast Finite State Entropy (tANS) or Huffman coding.\cite{zstd}
 \end{enumerate}
 
 In this article we would like to focus on comparison of compression algorithms, resulting in a new, analysis-oriented, default algorithm for ROOT in the latest development release, such as \textit{LZ4}, significant improvements of the compression speed of the prior default algorithm, such as \textit{ZLIB-CF}, and initial work on integrating a best-of-breed algorithm into ROOT, such as a \textit{ZSTD} compression algorithm.
@@ -99,11 +99,11 @@ For systems supporting Intel SSE4.2 and AVX2, as well as NEON vector extentions 
  
  \textit{Zlib} uses a hash table for look up of the location of previous occurrences of a given string in the sliding history window. For the fast compression levels (1-5), \textit{improved Zlib} hashes all elements as quadruplets, having hash entry map to a match of four. This is a reason of reduction of a hash chain and better the quality factor for each match, while \textit{Zlib} provides only the opportunity to match to length of three (triplets). In addition, on the systems supporting Intel SSE4.2, AVX2 for Intel \& Neon for ARMv8, it was used \textit{crc32} instruction to provide a faster hash function.
 
- The sad part of story is that \textit{Zlib} code base has a long history starting from 1995 and has previously been optimized for a set of old platforms and compilers. Excessive loop unrolling was one the efficient pattern in past, but not anymore needed for the modern processors, which are capable better scheduling of resources and executing instructions simultaneously. In \textit{Zlib} it is widely used in the \textit{adler32} and \textit{crc32} computations. In \textit{zlib-cf}, for the \textit{adler32} computation, it was reduced the unrolling factor from 16 to 8, and for \textit{crc32} computation, it was reduced from 8 to 4. 
+\textit{Zlib} code base has a long history starting from 1995 and has previously been optimized for a set of old platforms and compilers. Excessive loop unrolling was one the efficient pattern in past, but not anymore needed for the modern processors, which are capable better scheduling of resources and executing instructions simultaneously. In \textit{Zlib} it is widely used in the \textit{adler32} and \textit{crc32} computations. In \textit{zlib-cf}, for the \textit{adler32} computation, it was reduced the unrolling factor from 16 to 8, and for \textit{crc32} computation, it was reduced from 8 to 4. 
  
  Finally for ROOT 6.18.00, we have contributed a set of patches for improving \textit{Zlib} performance as shown in Figure \ref{fig:cflaptop} and \ref{fig:cfneon}. The performance results provided on these figures were measured on an Intel®Core™ i7 Haswell laptop equipped with SSD and supporting Intel® SSE 4.2 and AVX2 instruction-set (Figure \ref{fig:cflaptop}) and Intel Haswell  Intel® Xeon® E5 v3 server.
  
- For the aarch64 platform was used ARCH64+CRC32 HiSilicon's Hi1612 processor (Taishan 2180) supporting Neon and hardware implementation of \textit{crc32} instructions (Figure \ref{fig:cfneon}) kindly provided by Techlab. 
+ For the aarch64 platform was used ARCH64+CRC32 HiSilicon's Hi1612 processor (Taishan 2180) supporting Neon and hardware implementation of \textit{crc32} instructions (Figure \ref{fig:cfneon}) kindly provided by CERN Techlab. 
 
 As a basis for developments was used sources of \textit{Cloudflare ZLIB} \cite{zlib-cf-sources} and its extended version \textit{CMS-ZLIB-CF} \cite{zlib-cf-cms} from CMS software stack. Both performance and compatibility with multiple platforms were further improved by DIANA-HEP. The new version is referred here and below as a “CF-ZLIB”. CF-ZLIB will be available in ROOT 6.18.00.
 
@@ -127,7 +127,7 @@ As a basis for developments was used sources of \textit{Cloudflare ZLIB} \cite{z
 
 Significant improvements in \textit{LZ4} compression ratio inspired us to use \textit{LZ4\_HC} in ROOT. One of the disadvantages is an extra overhead that makes the compression speed impacted: the \textit{HC} version is actually slower than the \textit{LZ4-1}, a fastest setting for \textit{LZ4}, but still giving an advantage comparing to \textit{ZLIB-1} (see the comparison on Figure \ref{fig:compression}).
 
-During tests of \textit{LZ4} as a default compression algorithm in ROOT was discovered a "corner case" for LZ4. One of the weak sides of \textit{LZ4} is a compression of small chunks of data, such as an multidimensional array of \textit{int}'s, reported by user in case of TTree generated with variable-sized branches embed an “entry offset” array in their on-disk representation. After investigation we found that there are two ways out: usage of the compression pre-conditioners or dictionary compression (you can read more about it in the \textit{ZSTD} section). 
+During tests of \textit{LZ4} as a default compression algorithm in ROOT was discovered a "corner case" for LZ4. One of the weak sides of \textit{LZ4} is a compression of small chunks of data, reported by user in case of TTree generated with variable-sized branches embed an “entry offset” array in their on-disk representation. Simplest solutions are usage of the compression pre-conditioners or dictionary compression (you can read more about it in the \textit{ZSTD} section). 
 
 Pre-conditioners help to arrange bits of the values to compress sequences for primitive branches in ROOT TTree more efficiently. In case of pre-conditioners, the best algorithms that rearranges typed, binary data for improving compression ratio are:
 \begin{enumerate}
@@ -135,7 +135,7 @@ Pre-conditioners help to arrange bits of the values to compress sequences for pr
     \item \textit{BitShuffle} - integrated bit shuffle pre-conditioner (available in Blosc \cite{blosc})
 \end{enumerate}
 
-Preliminary results is showing the promising results, shown on Figure \ref{fig:bitshuffle}. It is a promising result that shows that \textit{LZ4} can outperform \textit{ZLIB} by better compression ratio, while compression time should be still optimized.
+Preliminary results is showing the promising results(Figure \ref{fig:bitshuffle}). It is a promising result that shows that \textit{LZ4} can outperform \textit{ZLIB} by better compression ratio, while compression time should be still optimized.
 \begin{figure}
 \centering
 \begin{tikzpicture}[scale=0.75]
@@ -160,26 +160,24 @@ Preliminary results is showing the promising results, shown on Figure \ref{fig:b
 \caption{Bitshuffle filter used for LZ4 compression of NanoAOD file in ROOT.} \label{fig:bitshuffle}
 \end{figure}
 
-In case of usage of the dictionaries, sadly \textit{LZ4} doesn't support dictionary generation. Then dictionary can be created by using \textit{ZSTD} \cite{zstd}: \textit{zstd --train} on a set of samples. Interesting fact is that generated output after \textit{ZSTD} is compatible with \textit{LZ4}. One of the limitations are that dictionary size which should be less or equal then 64 KB, since \textit{LZ4} will not be able to use more content anyway. Tests shows that the speed could be faster than in case of \textit{Zlib}, by an order of magnitude. Other pleasant optimisation could be achieved simple enable aggressive compilation flags optimisation and may influence the result in less or equal 20 \% improvement.
+%In case of usage of the dictionaries, sadly \textit{LZ4} doesn't support dictionary generation. Then dictionary can be created by using \textit{ZSTD} \cite{zstd}: \textit{zstd --train} on a set of samples. Interesting fact is that generated output after \textit{ZSTD} is compatible with \textit{LZ4}. One of the limitations are that dictionary size which should be less or equal then 64 KB, since \textit{LZ4} will not be able to use more content anyway. Tests shows that the speed could be faster than in case of \textit{Zlib}, by an order of magnitude. Other pleasant optimisation could be achieved simple enable aggressive compilation flags optimisation and may influence the result in less or equal 20 \% improvement.
 
 \subsection{ZSTD}
 
-The initial promise of \textit{Zstandard} \cite{zstd} \cite{zstd-facebook} was that it would allow users or software frameworks to replace their existing data compression implementation (e.g., for example for the ROOT, it is \textit{Zlib} or \textit{LZ4} depending on ROOT version) with three-dimensional improvements: compression speed, compression ratio, and decompression speed. New interesting features offered by \textit{ZSTD} and considered to be competitive comparing to other algorithms, are bigger block size, compression dictionary support and many others.
+The initial promise of \textit{Zstandard} \cite{zstd} \cite{zstd-facebook} was that it would allow users or software frameworks to replace their existing data compression implementation (e.g., for example for the ROOT, it is \textit{Zlib} or \textit{LZ4} depending on ROOT version) with improved compression ratio, compression speed, and decompression speed. A new interesting features offered by \textit{ZSTD} and considered to be competitive comparing to other algorithms, are bigger block size, compression dictionary support and many others.
 
 The block size for \textit{ZSTD} is now 256 KB, which it is eight times larger than the size of the \textit{Zlib} window. Additional effort by \textit{ZSTD} developers was put into an optimisation of the data transformations that were designed to outperform the \textit{Zlib} compression.  With search history limited to 32 KB, profiling of \textit{Zlib} showed a lot of redundant operations that could be better optimized. Meanwhile \textit{ZSTD} is able to analyze larger history and  achieved reduction for the number of transformation stages allows to save in CPU capacity, memory, and latency. This improvements could be very interesting for the data and storage management for the software frameworks, in terms of Run 3 requirements provided by \textit{LHC} experiments \cite{zstd-facebook}. 
 
-The top level feature of \textit{ZSTD} is a dictionary generation. A dictionary makes it possible for the compression algorithm's compressor to start from a meaningful state instead of an empty one. It makes compression much more effective, even when compressing a small amount of data, such as a few hundred bytes. The dictionary is generated by analyzing sample data, presuming that the rest of the data to compress will be similar. As a part of distribution process, dictionary could be provided along as part of ROOT file.
+The top level feature of \textit{ZSTD} is a dictionary generation. A dictionary makes it possible for the compression algorithm's compressor to start from a meaningful state instead of an empty one. It makes compression much more effective, even when compressing a small amount of data, such as a few hundred bytes. The dictionary is generated by analyzing sample data, presuming that the rest of the data to compress will be a similar. As a part of distribution process, dictionary could be provided along as a part of ROOT file.
 
-All together, these and many others features make \textit{ZSTD} a powerful and flexible compressor engine that was developed and  widely used by top industry companies as Facebook. \textit{ZSTD} can outperform \textit{Zlib} in multi dimensional performance space and provides a number of features that allow it to be applied in multiple HEP scenarios that was traditionally have been difficult for "classical" compressors.
+All together, these and many others features make \textit{ZSTD} a powerful and flexible compressor engine that was developed and  widely used by top industry companies as Facebook. \textit{ZSTD} can outperform \textit{Zlib} and provides the benefits that could be useful in multiple HEP scenarios that were traditionally difficult for "classical" compressors.
 
-Preliminary investigation results for \textit{ZSTD} is shown at the Figure \ref{fig:compression} and Figure \ref{fig:decompression} . \textit{ZSTD} is planned to available in ROOT 6.20.00.
+Preliminary investigation results for \textit{ZSTD} is shown at the Figure \ref{fig:compression} and Figure \ref{fig:decompression}. \textit{ZSTD} is planned to available in ROOT 6.20.00.
 
 \section{Results}
-As part of the DIANA/HEP to improve ROOT-based analysis, we have continued work in comparing compression algorithms \cite{brianzhe}. In the scope of this article, we included a detailed overview of pro and cons of main existing compression algorithms such as LZ4, ZSTD, ZLIB and ZLIB-CF.
+As part of the DIANA-HEP initiative to improve ROOT-based analysis, we have continued work in comparing compression algorithms \cite{brianzhe}. In the scope of this article, we included a detailed overview of pro and cons of main existing compression algorithms such as LZ4, ZSTD, ZLIB and ZLIB-CF. Results could be used for evaluation of ROOT I/O and in particularly, its compression and decompression functionality. 
 
-We were comparing algorithms in three-dimensional performance space, using the most interesting metrics for HEP community: compression ratio, compression speed and decompression speed. Results could be used for evaluation of ROOT I/O in particularly its compression and decompression functionality for ROOT files. 
-
-Future work items include work on re-enabling \textit{}{LZ4} as a default ROOT compression algorithm, work on improvement of I/O interfaces for easier switching between compression algorithms and further work on optimization of compression algorithms in ROOT (using of compression dictionaries and etc.). New ROOT I/O improvements will be automatically monitored and evaluated by the automatized performance benchmarking suite for ROOT \cite{rootbench}.
+Future work items include work on re-enabling \textit{LZ4} as a default ROOT compression algorithm, work on improvement of I/O interfaces for easier switching between compression algorithms and further work on optimization of compression algorithms in ROOT (using of compression dictionaries and etc.). ROOT I/O performance could be tracked using the automatized performance benchmarking suite for ROOT \cite{rootbench}.
 
 \section{Acknowledgments}
 
